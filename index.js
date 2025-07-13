@@ -32,10 +32,13 @@ try {
 }
 
 async function main() {
-  const deploymentId = VERCEL_DEPLOYMENT.startsWith("dpl_")
-    ? VERCEL_DEPLOYMENT
+  // Extract domain from URL if needed
+  const domain = extractDomain(VERCEL_DEPLOYMENT);
+  
+  const deploymentId = domain.startsWith("dpl_")
+    ? domain
     : await oraPromise(
-        getDeploymentId(VERCEL_DEPLOYMENT),
+        getDeploymentId(domain),
         "Getting deployment id"
       );
   const srcFiles = await oraPromise(
@@ -71,7 +74,9 @@ async function getDeploymentSource(id) {
 }
 
 async function getDeploymentId(domain) {
-  const deployment = await getJSONFromAPI(`/v13/deployments/${domain}`);
+  let path = `/v13/deployments/${domain}`;
+  if (VERCEL_TEAM) path += `?teamId=${VERCEL_TEAM}`;
+  const deployment = await getJSONFromAPI(path);
   return deployment.id;
 }
 
@@ -115,4 +120,25 @@ function flattenTree({ name, children = [] }) {
     childrenNamed,
     childrenNamed.map(flattenTree)
   );
+}
+
+function extractDomain(input) {
+  // If it's already a deployment ID, return as is
+  if (input.startsWith("dpl_")) {
+    return input;
+  }
+  
+  // If it's a full URL, extract the domain
+  if (input.startsWith("http://") || input.startsWith("https://")) {
+    try {
+      const url = new URL(input);
+      return url.hostname;
+    } catch (error) {
+      console.log(error("Invalid URL format"));
+      return input;
+    }
+  }
+  
+  // If it's already a domain, return as is
+  return input;
 }
